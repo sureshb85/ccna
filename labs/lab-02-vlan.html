@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab 02 - VLAN</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+<nav class="nav"><a class="brand" href="../index.html">CCNA <b>LABS</b></a><div class="navlinks"><a href="index.html">All labs</a></div></nav>
+<main class="wrap"><a class="back" href="index.html">← All labs</a><article class="lesson">
+
+<h1>Lab 02 - VLAN Configuration</h1>
+
+<h2>Objective</h2>
+
+<p>
+Create VLANs and assign switch ports to the appropriate VLAN.
+</p>
+
+<h2>Topology</h2>
+
+<pre>
+
+PC1 ---- SW1
+PC2 ---- SW1
+PC3 ---- SW1
+PC4 ---- SW1
+
+VLAN 10 - USERS
+VLAN 20 - SERVERS
+
+</pre>
+
+<img class="topology-image" src="lab-02-vlan.png" alt="VLAN topology showing the switch and departmental VLANs">
+
+<h2>Create VLANs</h2>
+
+<pre>
+enable
+configure terminal
+
+vlan 10
+ name USERS
+
+vlan 20
+ name SERVERS
+</pre>
+
+<h2>Assign Access Ports</h2>
+
+<pre>
+interface g0/1
+ switchport mode access
+ switchport access vlan 10
+
+interface g0/2
+ switchport mode access
+ switchport access vlan 10
+
+interface g0/3
+ switchport mode access
+ switchport access vlan 20
+
+interface g0/4
+ switchport mode access
+ switchport access vlan 20
+
+end
+</pre>
+
+<h2>Verification</h2>
+
+<pre>
+show vlan brief
+show interfaces status
+</pre>
+
+<h2>Expected Result</h2>
+
+<p>
+Ports connected to PC1 and PC2 should appear in VLAN 10.
+Ports connected to PC3 and PC4 should appear in VLAN 20.
+</p>
+
+<h2>Important Concept</h2>
+
+<p>
+A VLAN creates a separate Layer 2 broadcast domain.
+Devices in different VLANs cannot communicate directly at Layer 2.
+A Layer 3 device is required for communication between VLANs.
+</p>
+
+<a class="back" href="index.html">← All labs</a>
+</article></main>
+<footer>Basic Networking Labs · CCNA practice from scratch</footer>
+
+</body>
+</html>

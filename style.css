@@ -1,0 +1,497 @@
+/* =========================================
+   Network Engineering from Scratch
+   Global Styles
+   ========================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    background: #f5f7fa;
+    color: #17202a;
+    font-family: Arial, Helvetica, sans-serif;
+    line-height: 1.6;
+}
+
+/* =========================================
+   Links
+   ========================================= */
+
+a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* =========================================
+   Navigation
+   ========================================= */
+
+.nav {
+    background: #111827;
+    color: white;
+
+    min-height: 65px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 0 30px;
+}
+
+.brand {
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.brand b {
+    color: #f97316;
+}
+
+.navlinks {
+    display: flex;
+    gap: 25px;
+}
+
+.navlinks a {
+    color: #d1d5db;
+    font-size: 14px;
+}
+
+.navlinks a:hover {
+    color: white;
+    text-decoration: none;
+}
+
+/* =========================================
+   Hero
+   ========================================= */
+
+.hero {
+    background: #111827;
+    color: white;
+}
+
+.hero-inner {
+    max-width: 1100px;
+    margin: auto;
+
+    padding: 75px 30px 80px;
+}
+
+.kicker {
+    color: #f97316;
+
+    font-size: 11px;
+    font-weight: 700;
+
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.hero h1 {
+    margin: 15px 0;
+
+    font-size: clamp(42px, 7vw, 72px);
+    line-height: 1.05;
+
+    letter-spacing: -2px;
+}
+
+.hero h1 em {
+    color: #9ca3af;
+    font-style: normal;
+}
+
+.hero p {
+    max-width: 720px;
+
+    color: #cbd5e1;
+
+    font-size: 18px;
+}
+
+/* =========================================
+   Main Container
+   ========================================= */
+
+.wrap {
+    max-width: 1100px;
+    margin: auto;
+
+    padding: 50px 30px;
+}
+
+/* =========================================
+   Cards
+   ========================================= */
+
+.grid {
+    display: grid;
+
+    grid-template-columns: repeat(3, 1fr);
+
+    gap: 18px;
+}
+
+.card {
+    display: block;
+
+    background: white;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+
+    padding: 25px;
+
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+
+    text-decoration: none;
+}
+
+.card .num {
+    color: #f97316;
+
+    font-size: 11px;
+    font-weight: 700;
+
+    letter-spacing: 1px;
+}
+
+.card h2 {
+    margin: 8px 0;
+
+    color: #17202a;
+
+    font-size: 24px;
+}
+
+.card p {
+    color: #64748b;
+
+    font-size: 14px;
+}
+
+/* =========================================
+   Modules / Content Sections
+   ========================================= */
+
+.module {
+    background: white;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+
+    padding: 30px;
+
+    margin-bottom: 20px;
+}
+
+.module h2 {
+    margin-top: 0;
+
+    font-size: 30px;
+}
+
+/* =========================================
+   Lessons
+   ========================================= */
+
+.lesson {
+    background: white;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+
+    padding: 30px;
+
+    margin-bottom: 18px;
+}
+
+.lesson h2 {
+    margin-top: 5px;
+
+    font-size: 28px;
+}
+
+.lesson h3 {
+    margin-top: 28px;
+
+    font-size: 19px;
+}
+
+.lesson p,
+.lesson li {
+    color: #475569;
+}
+
+/* =========================================
+   Notice / Important Information
+   ========================================= */
+
+.notice {
+    background: #fff7ed;
+
+    border-left: 4px solid #f97316;
+
+    padding: 18px 20px;
+
+    margin-bottom: 25px;
+
+    border-radius: 6px;
+}
+
+.notice b {
+    color: #c2410c;
+}
+
+/* =========================================
+   Code Blocks
+   ========================================= */
+
+pre {
+    background: #111827;
+
+    color: #e5e7eb;
+
+    padding: 20px;
+
+    border-radius: 8px;
+
+    overflow-x: auto;
+
+    font-family:
+        "Courier New",
+        Consolas,
+        monospace;
+
+    font-size: 14px;
+
+    line-height: 1.6;
+}
+
+/* Inline code */
+
+code {
+    background: #f1f5f9;
+
+    color: #c2410c;
+
+    padding: 2px 5px;
+
+    border-radius: 4px;
+
+    font-family:
+        "Courier New",
+        Consolas,
+        monospace;
+}
+
+/* =========================================
+   Two Column Layout
+   ========================================= */
+
+.two {
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 20px;
+}
+
+/* =========================================
+   Lab Highlight
+   ========================================= */
+
+.lab {
+    border-left: 5px solid #f97316;
+}
+
+/* =========================================
+   Buttons / Lab Links
+   ========================================= */
+
+.lab-link {
+    display: inline-block;
+
+    background: #111827;
+
+    color: white;
+
+    padding: 11px 18px;
+
+    border-radius: 6px;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    margin-top: 10px;
+}
+
+.lab-link:hover {
+    background: #1f2937;
+
+    color: white;
+
+    text-decoration: none;
+}
+
+/* =========================================
+   Back Link
+   ========================================= */
+
+.back {
+    display: inline-block;
+
+    margin-bottom: 25px;
+
+    color: #f97316;
+
+    font-size: 14px;
+}
+
+/* =========================================
+   Lists
+   ========================================= */
+
+ul {
+    padding-left: 22px;
+}
+
+li {
+    margin-bottom: 7px;
+}
+
+/* =========================================
+   Tables
+   ========================================= */
+
+table {
+    width: 100%;
+
+    border-collapse: collapse;
+
+    margin: 20px 0;
+}
+
+th,
+td {
+    border: 1px solid #e5e7eb;
+
+    padding: 12px;
+
+    text-align: left;
+}
+
+th {
+    background: #f1f5f9;
+
+    font-weight: 700;
+}
+
+/* =========================================
+   Sources / References
+   ========================================= */
+
+.sources {
+    color: #64748b;
+
+    font-size: 13px;
+
+    margin-top: 30px;
+}
+
+.sources a {
+    color: #2563eb;
+}
+
+/* =========================================
+   Footer
+   ========================================= */
+
+footer {
+    border-top: 1px solid #e5e7eb;
+
+    background: white;
+
+    padding: 30px;
+
+    text-align: center;
+
+    color: #94a3b8;
+
+    font-size: 13px;
+}
+
+/* =========================================
+   Responsive Design
+   ========================================= */
+
+@media (max-width: 800px) {
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .two {
+        grid-template-columns: 1fr;
+    }
+
+    .nav {
+        padding: 0 18px;
+    }
+
+    .navlinks {
+        display: none;
+    }
+
+    .hero-inner {
+        padding: 55px 20px;
+    }
+
+    .wrap {
+        padding: 35px 20px;
+    }
+
+    .hero h1 {
+        font-size: 45px;
+    }
+
+    .module,
+    .lesson {
+        padding: 22px;
+    }
+
+    pre {
+        font-size: 12px;
+    }
+}
+
+.topology-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin: 20px 0 30px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
