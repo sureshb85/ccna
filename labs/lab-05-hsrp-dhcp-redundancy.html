@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CCNA HSRP gateway redundancy with Cisco IOS DHCP and VPCS clients.">
+    <title>Lab 05 - HSRP and DHCP Redundancy</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="nav"><a class="brand" href="../index.html">CCNA <b>LABS</b></a><div class="navlinks"><a href="index.html">All labs</a></div></nav>
+<main class="wrap"><a class="back" href="index.html">← All labs</a><article class="lesson">
+
+<h1>Lab 05 - HSRP Gateway Redundancy with DHCP</h1>
+
+<h2>Objective</h2>
+<p>Build a redundant default gateway for a VPC LAN. BNG, HYD, and GOA share one Layer-2 segment and run HSRP group 1. Clients obtain their address, mask, default gateway, and DNS server automatically from the DHCP service on BNG. The HSRP virtual IP address, <code>10.1.1.100</code>, is the gateway supplied to every client. When the active router fails, a standby router takes over that virtual address and client traffic continues without changing its gateway.</p>
+
+<h2>Topology and addressing plan</h2>
+<pre>
+                                  ISP / optional upstream router
+                       192.168.10.0/24     192.168.20.0/24     192.168.30.0/24
+                              |                    |                    |
+                            BNG                  HYD                  GOA
+                         Gi0/1 .1             Gi0/1 .2             Gi0/1 .3
+                              \                  |                  /
+                               \                 |                 /
+                              Gi0/1           Gi0/0             Gi0/0
+                                   \            |             /
+                                    +--- SWITCH2 ---+
+                                     |     |      |
+                                   VPC5  VPC6   VPC7
+
+                   Client LAN: 10.1.1.0/24
+                   BNG LAN IP: 10.1.1.1       HSRP priority 120 (preferred active)
+                   HYD LAN IP: 10.1.1.2       HSRP priority 110 (preferred standby)
+                   GOA LAN IP: 10.1.1.3       HSRP priority 90  (second standby)
+                   HSRP group 1 virtual IP:   10.1.1.100
+                   DHCP scope:                 10.1.1.21 - 10.1.1.200
+</pre>
+<p>The interface names follow the labels in the diagram. If your router image uses <code>GigabitEthernet0/0/0</code>, <code>GigabitEthernet0/0/1</code>, and so on, substitute those exact interface names. The three interfaces facing Switch2 must be in the same untagged VLAN.</p>
+
+<h2>Before you start</h2>
+<ol>
+    <li>Add three Cisco IOS routers (BNG, HYD, GOA), one Layer-2 switch (Switch2), and at least three VPCS nodes (VPC5, VPC6, VPC7).</li>
+    <li>Connect each router’s LAN interface to Switch2. Connect each VPC <code>eth0</code> to a separate Switch2 access port.</li>
+    <li>Start all nodes and open their consoles. Do not configure static IP addresses on VPC5–VPC7; DHCP is the point of the lab.</li>
+    <li>The ISP-facing links in the picture are optional for the HSRP/DHCP exercise. Configure them only if you want upstream/internet simulation. They are included below as an optional extension.</li>
+</ol>
+
+<h2>Step 1 - Configure Switch2</h2>
+<p>All router and VPC ports belong to VLAN 10. This port assignment matches the labels in the supplied topology: BNG Gi0/0 to Switch2 Gi0/0, HYD Gi0/0 to Switch2 Gi0/2, GOA Gi0/0 to Switch2 Gi0/1, VPC5 to Gi0/3, VPC6 to Gi1/0, and VPC7 to Gi1/1. A Layer-2 switch does not need an IP address for this lab. PortFast is enabled only on VPC-facing ports, never on router-facing ports.</p>
+<pre>
+enable
+configure terminal
+hostname SWITCH2
+
+vlan 10
+ name USERS_HSRP
+exit
+
+! BNG LAN link
+interface gi0/0
+ description TO_BNG_LAN
+ switchport mode access
+ switchport access vlan 10
+ no shutdown
+exit
+
+! HYD LAN link
+interface gi0/2
+ description TO_HYD_LAN
+ switchport mode access
+ switchport access vlan 10
+ no shutdown
+exit
+
+! GOA LAN link
+interface gi0/1
+ description TO_GOA_LAN
+ switchport mode access
+ switchport access vlan 10
+ no shutdown
+exit
+
+! VPC5 (Switch2 Gi0/3)
+interface gi0/3
+ description TO_VPC5_DHCP_CLIENT
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+ no shutdown
+exit
+
+! VPC6 (Switch2 Gi1/0)
+interface gi1/0
+ description TO_VPC6_DHCP_CLIENT
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+ no shutdown
+exit
+
+! VPC7 (Switch2 Gi1/1)
+interface gi1/1
+ description TO_VPC7_DHCP_CLIENT
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+ no shutdown
+end
+copy running-config startup-config
+</pre>
+<p>If your switch rejects <code>interface range gi0/3 - 0/5</code>, configure Gi0/3, Gi0/4, and Gi0/5 separately. Confirm the ports with <code>show vlan brief</code> and <code>show interfaces status</code>.</p>
+
+<h2>Step 2 - Configure BNG: preferred active gateway and DHCP server</h2>
+<p>BNG has the highest priority, so it becomes active. The <code>standby 1 preempt</code> command lets it reclaim the active role after it recovers. The DHCP default-router option must point to the HSRP virtual IP, never to BNG’s physical address.</p>
+<pre>
+enable
+configure terminal
+hostname BNG
+no ip domain-lookup
+
+interface gigabitEthernet0/0
+ description TO_SWITCH2_USERS_HSRP
+ ip address 10.1.1.1 255.255.255.0
+ standby version 2
+ standby 1 ip 10.1.1.100
+ standby 1 priority 120
+ standby 1 preempt delay minimum 30
+ standby 1 name HSRP-USERS
+ no shutdown
+exit
+
+! Keep infrastructure and the HSRP addresses out of the lease pool.
+ip dhcp excluded-address 10.1.1.1 10.1.1.20
+ip dhcp excluded-address 10.1.1.100
+ip dhcp excluded-address 10.1.1.201 10.1.1.254
+
+ip dhcp pool USERS-HSRP
+ network 10.1.1.0 255.255.255.0
+ default-router 10.1.1.100
+ dns-server 8.8.8.8 1.1.1.1
+ domain-name lab.local
+ lease 1
+exit
+end
+copy running-config startup-config
+</pre>
+<p><strong>Why only BNG runs DHCP:</strong> IOS DHCP servers do not share leases with each other. Using the same pool independently on all three routers can create duplicate IP assignments. This lab keeps one authoritative DHCP server and makes the default gateway redundant through HSRP.</p>
+
+<h2>Step 3 - Configure HYD: first standby gateway</h2>
+<pre>
+enable
+configure terminal
+hostname HYD
+no ip domain-lookup
+
+interface gigabitEthernet0/0
+ description TO_SWITCH2_USERS_HSRP
+ ip address 10.1.1.2 255.255.255.0
+ standby version 2
+ standby 1 ip 10.1.1.100
+ standby 1 priority 110
+ standby 1 preempt delay minimum 30
+ standby 1 name HSRP-USERS
+ no shutdown
+end
+copy running-config startup-config
+</pre>
+
+<h2>Step 4 - Configure GOA: second standby gateway</h2>
+<pre>
+enable
+configure terminal
+hostname GOA
+no ip domain-lookup
+
+interface gigabitEthernet0/0
+ description TO_SWITCH2_USERS_HSRP
+ ip address 10.1.1.3 255.255.255.0
+ standby version 2
+ standby 1 ip 10.1.1.100
+ standby 1 priority 90
+ standby 1 preempt delay minimum 30
+ standby 1 name HSRP-USERS
+ no shutdown
+end
+copy running-config startup-config
+</pre>
+<p>After the HSRP hello timers converge, BNG should be <code>Active</code>, HYD <code>Standby</code>, and GOA <code>Listen</code>. All three routers must use the same HSRP version, group number, and virtual IP.</p>
+
+<h2>Step 5 - Request DHCP addresses on the VPCS nodes</h2>
+<p>On each VPCS console, request a lease. Do this only after BNG and Switch2 are up.</p>
+<pre>
+VPC5&gt; ip dhcp
+VPC5&gt; show ip
+
+VPC6&gt; ip dhcp
+VPC6&gt; show ip
+
+VPC7&gt; ip dhcp
+VPC7&gt; show ip
+</pre>
+<p>Each client should receive a unique address between <code>10.1.1.21</code> and <code>10.1.1.200</code>, with mask <code>255.255.255.0</code> and default gateway <code>10.1.1.100</code>. The exact client address can differ each time a lease is released or renewed.</p>
+
+<h2>Step 6 - Verify normal operation</h2>
+<pre>
+! On BNG: it should report Active and show the lease bindings.
+show standby brief
+show standby
+show ip dhcp binding
+show ip dhcp pool
+
+! On HYD and GOA: confirm their roles and HSRP peer addresses.
+show standby brief
+show standby
+
+! On SWITCH2: all attached ports should be in VLAN 10 and up.
+show vlan brief
+show interfaces status
+
+! On any VPCS node: test the virtual gateway and other clients.
+ping 10.1.1.100
+ping 10.1.1.1
+ping 10.1.1.2
+ping 10.1.1.3
+</pre>
+
+<h2>Step 7 - Test HSRP failover</h2>
+<p>Keep a continuous ping running from VPC5 while you disable BNG’s LAN interface. One or a few pings may be lost while HYD promotes itself; the VPC address and default gateway remain unchanged.</p>
+<pre>
+! VPC5: start this first
+VPC5&gt; ping 10.1.1.100 -c 100
+
+! BNG: simulate a LAN-interface failure
+BNG# configure terminal
+BNG(config)# interface gigabitEthernet0/0
+BNG(config-if)# shutdown
+BNG(config-if)# end
+
+! HYD: it should now be Active
+HYD# show standby brief
+
+! VPC5: confirm the gateway still answers
+VPC5&gt; ping 10.1.1.100
+</pre>
+<p>Restore BNG. Because its priority is 120 and preemption is enabled, it waits at least 30 seconds and then becomes active again.</p>
+<pre>
+BNG# configure terminal
+BNG(config)# interface gigabitEthernet0/0
+BNG(config-if)# no shutdown
+BNG(config-if)# end
+BNG# show standby brief
+</pre>
+<p>For a second failover test, shut down HYD’s LAN interface while BNG is unavailable. GOA should become active.</p>
+
+<h2>Optional upstream routing (to match the ISP portion of the diagram)</h2>
+<p>This extension makes the three routers reach an upstream ISP router. It is not required for HSRP or local DHCP. On BNG, HYD, and GOA, configure the illustrated WAN link and a default route. The ISP router needs return routes for <code>10.1.1.0/24</code>; for return-path resilience, install three equal static routes or run a routing protocol.</p>
+<pre>
+! BNG: its ISP link is Gi0/1 in the picture
+interface gigabitEthernet0/1
+ description TO_ISP_192.168.10.0_24
+ ip address 192.168.10.1 255.255.255.0
+ no shutdown
+exit
+ip route 0.0.0.0 0.0.0.0 192.168.10.100
+
+! HYD
+interface gigabitEthernet0/1
+ description TO_ISP_192.168.20.0_24
+ ip address 192.168.20.2 255.255.255.0
+ no shutdown
+exit
+ip route 0.0.0.0 0.0.0.0 192.168.20.100
+
+! GOA
+interface gigabitEthernet0/1
+ description TO_ISP_192.168.30.0_24
+ ip address 192.168.30.3 255.255.255.0
+ no shutdown
+exit
+ip route 0.0.0.0 0.0.0.0 192.168.30.100
+</pre>
+<p>For real end-to-end upstream redundancy, add <code>standby 1 track &lt;WAN-object&gt; decrement 30</code> on each gateway router so a router that loses its WAN path gives up HSRP active status. Tracking syntax varies by IOS release, so first verify support with <code>?</code> in interface configuration mode.</p>
+
+<h2>Troubleshooting</h2>
+<pre>
+Problem: VPCS gets no DHCP address
+Check:   Switch port is VLAN 10 and up; BNG Gi0/0 is up/up; DHCP pool exists.
+Commands: show vlan brief
+          show ip interface brief
+          show ip dhcp pool
+          show ip dhcp binding
+Fix:     Correct the VLAN/interface issue, then run "ip dhcp" again on the VPCS node.
+
+Problem: HSRP virtual IP does not answer
+Check:   All three router LAN interfaces share 10.1.1.0/24 and use group 1,
+         virtual IP 10.1.1.100, and HSRP version 2.
+Commands: show standby brief
+          show running-config interface gigabitEthernet0/0
+
+Problem: Wrong router is active
+Check:   Compare priority and preempt settings with "show standby brief".
+Fix:     BNG must be 120, HYD 110, GOA 90; enable preempt on each router.
+
+Problem: New DHCP clients fail after BNG fails
+Meaning: DHCP is intentionally a single service in this base lab; existing clients
+         keep forwarding through HSRP, but BNG cannot issue/renew leases while down.
+Fix:     Restore BNG, or deploy a real redundant DHCP solution (for example DHCP
+         failover on supported servers) for production use.
+</pre>
+
+<h2>Key takeaways</h2>
+<p>HSRP protects the client default gateway by presenting one virtual IP and virtual MAC address. DHCP clients should receive that virtual IP as their default gateway. HSRP does not itself replicate DHCP leases: gateway redundancy and DHCP-server redundancy are separate design requirements.</p>
+
+<a class="back" href="index.html">← All labs</a>
+</article></main>
+<footer>Basic Networking Labs · CCNA practice from scratch</footer>
+</body>
+</html>

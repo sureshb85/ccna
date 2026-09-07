@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CCNA inter-VLAN routing lab with dedicated routed router interfaces.">
+    <title>Lab 06 - Inter-VLAN Routing</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="nav"><a class="brand" href="../index.html">CCNA <b>LABS</b></a><div class="navlinks"><a href="index.html">All labs</a></div></nav>
+<main class="wrap"><a class="back" href="index.html">← All labs</a><article class="lesson">
+
+<h1>Lab 06 - Inter-VLAN Routing with Routed Interfaces</h1>
+
+<h2>Objective</h2>
+<p>Create IT and HR VLANs on a Layer 2 switch, then route traffic between them with two dedicated router interfaces. Unlike router-on-a-stick, this design uses no switch trunk and no router subinterfaces: each VLAN has its own physical router link.</p>
+
+<h2>Topology</h2>
+<img class="topology-image" src="lab-06-inter-vlan-routing-routed-interfaces.png" alt="EVE-NG inter-VLAN routing topology: VPC3 in IT VLAN 10 and VPC4 in HR VLAN 20 attach to a switch, which uses separate access links to a router.">
+<table>
+    <thead><tr><th>Endpoint</th><th>Switch port / router port</th><th>VLAN and IP address</th></tr></thead>
+    <tbody>
+        <tr><td>VPC3 (IT)</td><td>Switch Gi0/0</td><td>VLAN 10 — 10.1.1.100/24, gateway 10.1.1.1</td></tr>
+        <tr><td>IT router link</td><td>Switch Gi0/3 ↔ Router Gi0/1</td><td>VLAN 10 — Router 10.1.1.1/24</td></tr>
+        <tr><td>VPC4 (HR)</td><td>Switch Gi0/1</td><td>VLAN 20 — 10.2.2.100/24, gateway 10.2.2.1</td></tr>
+        <tr><td>HR router link</td><td>Switch Gi0/2 ↔ Router Gi0/0</td><td>VLAN 20 — Router 10.2.2.1/24</td></tr>
+    </tbody>
+</table>
+
+<div class="notice"><b>Design note:</b> these router-facing switch ports remain access ports. Do not configure a trunk here. This works because the router receives untagged Ethernet frames from a single VLAN on each physical interface.</div>
+
+<h2>Part 1 - Configure the switch</h2>
+<p>Paste from the <code>Switch&gt;</code> prompt. Ports Gi0/0 and Gi0/3 belong to IT; Gi0/1 and Gi0/2 belong to HR.</p>
+<pre>
+enable
+configure terminal
+
+vlan 10
+ name IT
+vlan 20
+ name HR
+exit
+
+! VPC3 - IT
+interface GigabitEthernet 0/0
+ switchport mode access
+ switchport access vlan 10
+ no shutdown
+exit
+
+! VPC4 - HR
+interface GigabitEthernet 0/1
+ switchport mode access
+ switchport access vlan 20
+ no shutdown
+exit
+
+! Router Gi0/0 - HR gateway link
+interface GigabitEthernet 0/2
+ switchport mode access
+ switchport access vlan 20
+ no shutdown
+exit
+
+! Router Gi0/1 - IT gateway link
+interface GigabitEthernet 0/3
+ switchport mode access
+ switchport access vlan 10
+ no shutdown
+exit
+
+end
+copy running-config startup-config
+</pre>
+
+<h2>Part 2 - Configure the router</h2>
+<p>Paste from the <code>Router&gt;</code> prompt. The router automatically routes between its directly connected networks once both interfaces are addressed and enabled.</p>
+<pre>
+enable
+configure terminal
+
+! IT / VLAN 10 gateway
+interface GigabitEthernet 0/1
+ ip address 10.1.1.1 255.255.255.0
+ no shutdown
+exit
+
+! HR / VLAN 20 gateway
+interface GigabitEthernet 0/0
+ ip address 10.2.2.1 255.255.255.0
+ no shutdown
+exit
+
+end
+copy running-config startup-config
+</pre>
+
+<h2>Part 3 - Configure the VPCS nodes</h2>
+<p>This lab uses static addressing, so run the matching command in each <code>VPCS&gt;</code> console.</p>
+<div class="two"><div><h3>VPC3 — IT</h3><pre>
+ip 10.1.1.100/24 10.1.1.1
+save
+</pre></div><div><h3>VPC4 — HR</h3><pre>
+ip 10.2.2.100/24 10.2.2.1
+save
+</pre></div></div>
+
+<h2>Part 4 - Verify connectivity</h2>
+<table>
+    <thead><tr><th>Device</th><th>Command</th><th>Expected result</th></tr></thead>
+    <tbody>
+        <tr><td>Switch</td><td><code>show vlan brief</code></td><td>Gi0/0 and Gi0/3 in VLAN 10; Gi0/1 and Gi0/2 in VLAN 20.</td></tr>
+        <tr><td>Router</td><td><code>show ip interface brief</code></td><td>Gi0/0 is 10.2.2.1 and Gi0/1 is 10.1.1.1; both show up/up.</td></tr>
+        <tr><td>Router</td><td><code>show ip route</code></td><td>Connected routes for 10.1.1.0/24 and 10.2.2.0/24.</td></tr>
+        <tr><td>VPC3</td><td><code>show ip</code><br><code>ping 10.1.1.1</code><br><code>ping 10.2.2.100</code></td><td>Correct IT address and gateway; successful local-gateway then cross-VLAN replies.</td></tr>
+        <tr><td>VPC4</td><td><code>ping 10.1.1.100</code></td><td>Replies with TTL 63, showing one routed hop.</td></tr>
+    </tbody>
+</table>
+
+<h2>Troubleshooting</h2>
+<ul>
+    <li><b>Gateway unreachable:</b> confirm the VPCS port and its corresponding router-facing port are in the same VLAN.</li>
+    <li><b>Router interface down/down:</b> check the physical link and enable both ends with <code>no shutdown</code>.</li>
+    <li><b>Cross-VLAN ping fails but gateway ping works:</b> verify the other VPCS address and default gateway, then use <code>show ip route</code> to confirm both connected routes.</li>
+</ul>
+
+<h2>Additional activity - Four-VLAN extension</h2>
+<div class="notice"><b>Configuration to be added:</b> use this expanded topology as a follow-on exercise after completing the two-VLAN lab. The final switch, router, and VPCS command blocks will be added when the interface-to-VLAN mapping is finalized.</div>
+<img class="topology-image" src="lab-06-inter-vlan-routing-four-vlan-extension.png" alt="EVE-NG four-VLAN inter-VLAN routing extension with four VPCS clients, a switch, and dedicated router links.">
+<table>
+    <thead><tr><th>VPCS</th><th>VLAN</th><th>Subnet</th><th>Planned host address</th></tr></thead>
+    <tbody>
+        <tr><td>VPC3</td><td>10 — IT</td><td>10.1.1.0/24</td><td>10.1.1.100</td></tr>
+        <tr><td>VPC4</td><td>20 — HR</td><td>10.2.2.0/24</td><td>10.2.2.100</td></tr>
+        <tr><td>VPC5</td><td>30 — HR</td><td>10.3.3.0/24</td><td>10.3.3.100</td></tr>
+        <tr><td>VPC6</td><td>40 — HR</td><td>10.4.4.0/24</td><td>10.4.4.100</td></tr>
+    </tbody>
+</table>
+<p>When configured, this extension will use VLANs 10, 20, 30, and 40; one dedicated routed router interface per VLAN; static VPCS addressing; and cross-VLAN ping verification.</p>
+
+<a class="back" href="index.html">← All labs</a>
+</article></main>
+<footer>Basic Networking Labs · CCNA practice from scratch</footer>
+</body>
+</html>

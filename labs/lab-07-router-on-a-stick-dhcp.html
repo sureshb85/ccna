@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CCNA router-on-a-stick inter-VLAN routing with DHCP lab.">
+    <title>Lab 07 - Router-on-a-Stick with DHCP</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="nav"><a class="brand" href="../index.html">CCNA <b>LABS</b></a><div class="navlinks"><a href="index.html">All labs</a></div></nav>
+<main class="wrap"><a class="back" href="index.html">← All labs</a><article class="lesson">
+
+<h1>Lab 07 - Router-on-a-Stick Inter-VLAN Routing with DHCP</h1>
+
+<h2>Objective</h2>
+<p>Use one 802.1Q trunk between a switch and router to route between the IT and HR VLANs. The router also supplies each VPCS client with an address by DHCP.</p>
+
+<h2>Topology</h2>
+<img class="topology-image" src="lab-07-router-on-a-stick-dhcp.png" alt="EVE-NG topology: a router connects through a trunk to a switch. VPC3 is in VLAN 10, subnet 10.1.1.0/24; VPC4 is in VLAN 20, subnet 10.2.2.0/24.">
+<table>
+    <thead><tr><th>Link / endpoint</th><th>Interface / VLAN</th><th>Addressing</th></tr></thead>
+    <tbody>
+        <tr><td>VPC3 to Switch</td><td>Switch Gi0/0, access VLAN 10 (IT)</td><td>DHCP: 10.1.1.0/24; gateway 10.1.1.1</td></tr>
+        <tr><td>VPC4 to Switch</td><td>Switch Gi0/1, access VLAN 20 (HR)</td><td>DHCP: 10.2.2.0/24; gateway 10.2.2.1</td></tr>
+        <tr><td>Switch to Router</td><td>Switch Gi0/2 ↔ Router Gi0/0, 802.1Q trunk</td><td>VLANs 10 and 20 tagged</td></tr>
+    </tbody>
+</table>
+
+<div class="notice"><b>Before you start:</b> interface numbering must match your EVE-NG links. The supplied diagram uses Switch Gi0/0, Gi0/1, and Gi0/2, with Router Gi0/0. If your nodes use different names, substitute those names consistently. On IOSvL2, do not enter <code>switchport trunk encapsulation dot1q</code>; it supports only 802.1Q and rejects that command.</div>
+
+<h2>Part 1 - Configure the switch</h2>
+<p>Paste this from the <code>Switch&gt;</code> prompt. It creates the departmental VLANs, assigns the VPCS-facing ports, and forms the router trunk.</p>
+<pre>
+enable
+configure terminal
+
+! VLAN creation and naming
+vlan 10
+ name IT
+vlan 20
+ name HR
+exit
+
+! VPC3 - IT
+interface GigabitEthernet 0/0
+ switchport mode access
+ switchport access vlan 10
+ no shutdown
+exit
+
+! VPC4 - HR
+interface GigabitEthernet 0/1
+ switchport mode access
+ switchport access vlan 20
+ no shutdown
+exit
+
+! Router uplink
+interface GigabitEthernet 0/2
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20
+ no shutdown
+exit
+
+end
+copy running-config startup-config
+</pre>
+<p>If your switch supports selectable trunk encapsulation, insert <code>switchport trunk encapsulation dot1q</code> just before <code>switchport mode trunk</code>.</p>
+
+<h2>Part 2 - Configure the router</h2>
+<p>Paste this from the <code>Router&gt;</code> prompt. The parent interface has no IP address; the two 802.1Q subinterfaces are the VLAN default gateways.</p>
+<pre>
+enable
+configure terminal
+
+! Keep the gateway addresses out of DHCP leases
+ip dhcp excluded-address 10.1.1.1
+ip dhcp excluded-address 10.2.2.1
+
+! VLAN 10 / IT DHCP scope
+ip dhcp pool IT_POOL
+ network 10.1.1.0 255.255.255.0
+ default-router 10.1.1.1
+ dns-server 8.8.8.8
+exit
+
+! VLAN 20 / HR DHCP scope
+ip dhcp pool HR_POOL
+ network 10.2.2.0 255.255.255.0
+ default-router 10.2.2.1
+ dns-server 8.8.8.8
+exit
+
+! Physical trunk-facing interface
+interface GigabitEthernet 0/0
+ no ip address
+ no shutdown
+exit
+
+! VLAN 10 default gateway
+interface GigabitEthernet 0/0.10
+ encapsulation dot1Q 10
+ ip address 10.1.1.1 255.255.255.0
+exit
+
+! VLAN 20 default gateway
+interface GigabitEthernet 0/0.20
+ encapsulation dot1Q 20
+ ip address 10.2.2.1 255.255.255.0
+exit
+
+end
+copy running-config startup-config
+</pre>
+
+<h2>Part 3 - Request VPCS addresses</h2>
+<p>Run each pair of commands in the matching <code>VPCS&gt;</code> console.</p>
+<div class="two"><div><h3>VPC3 (IT)</h3><pre>
+dhcp
+save
+</pre><p>Expected address: <code>10.1.1.2</code> or another available address in <code>10.1.1.0/24</code>.</p></div><div><h3>VPC4 (HR)</h3><pre>
+dhcp
+save
+</pre><p>Expected address: <code>10.2.2.2</code> or another available address in <code>10.2.2.0/24</code>.</p></div></div>
+
+<h2>Part 4 - Verify DHCP and routing</h2>
+<table>
+    <thead><tr><th>Device</th><th>Command</th><th>Expected result</th></tr></thead>
+    <tbody>
+        <tr><td>Switch</td><td><code>show vlan brief</code><br><code>show interfaces trunk</code></td><td>Gi0/0 in VLAN 10, Gi0/1 in VLAN 20, and Gi0/2 trunking VLANs 10 and 20.</td></tr>
+        <tr><td>Router</td><td><code>show ip interface brief</code></td><td>Gi0/0, Gi0/0.10, and Gi0/0.20 are up/up; subinterfaces show both gateway IPs.</td></tr>
+        <tr><td>Router</td><td><code>show ip dhcp binding</code><br><code>show ip dhcp pool</code></td><td>A lease for each VPCS MAC address and pool utilization for both subnets.</td></tr>
+        <tr><td>VPC3</td><td><code>show ip</code></td><td>An IT subnet address, /24 mask, and gateway 10.1.1.1.</td></tr>
+        <tr><td>VPC3</td><td><code>ping &lt;VPC4-address&gt;</code></td><td>Replies from VPC4, proving inter-VLAN routing. Use VPC4's actual DHCP lease.</td></tr>
+    </tbody>
+</table>
+
+<h2>Troubleshooting</h2>
+<ul>
+    <li><b>No DHCP address:</b> check that the VPCS-facing port is in the correct VLAN, the switch uplink is trunking, and the matching router subinterface is up.</li>
+    <li><b>Lease works but cross-VLAN ping fails:</b> confirm the VPCS default gateways and the <code>encapsulation dot1Q</code> VLAN IDs match the switch VLANs.</li>
+    <li><b>Trunk command rejected:</b> omit the selectable encapsulation command on IOSvL2; use only <code>switchport mode trunk</code>.</li>
+</ul>
+
+<a class="back" href="index.html">← All labs</a>
+</article></main>
+<footer>Basic Networking Labs · CCNA practice from scratch</footer>
+</body>
+</html>

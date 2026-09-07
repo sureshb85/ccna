@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CCNA access control list theory: purpose, types, and differences.">
+    <title>Lab 08 - Access Control Lists Theory</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="nav"><a class="brand" href="../index.html">CCNA <b>LABS</b></a><div class="navlinks"><a href="index.html">All labs</a></div></nav>
+<main class="wrap"><a class="back" href="index.html">← All labs</a><article class="lesson">
+
+<h1>Lab 08 - Access Control Lists (ACLs)</h1>
+
+<h2>What is an ACL?</h2>
+<p>An access control list (ACL) is an ordered set of rules on a Cisco device that permits or denies traffic. A router or Layer 3 switch checks packets against those rules when an ACL is applied to an interface. ACLs are commonly used to control communication between VLANs, limit management access, and filter unwanted traffic.</p>
+
+<div class="notice"><b>How ACLs are evaluated:</b> rules are checked from top to bottom. The first matching rule is used, then evaluation stops. Every ACL ends with an implicit <code>deny any</code>, so traffic not explicitly permitted is denied.</div>
+
+<h2>Core terms</h2>
+<table>
+    <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+    <tbody>
+        <tr><td>ACE</td><td>An Access Control Entry: one permit or deny rule inside an ACL.</td></tr>
+        <tr><td>Inbound ACL</td><td>Traffic is checked as it enters an interface, before the device routes it onward.</td></tr>
+        <tr><td>Outbound ACL</td><td>Traffic is checked just before it leaves an interface.</td></tr>
+        <tr><td>Wildcard mask</td><td>A mask used in Cisco ACLs to identify which address bits must match. A <code>0</code> must match; a <code>1</code> is ignored.</td></tr>
+    </tbody>
+</table>
+
+<h2>Types of ACL</h2>
+<h3>Standard ACLs</h3>
+<p>Standard ACLs filter only by the source IPv4 address. They are simple and suited to broad decisions, such as allowing one network while denying another. Because they cannot identify a destination, protocol, or port, they are normally placed close to the destination.</p>
+<pre>
+access-list 10 permit 10.1.1.0 0.0.0.255
+access-list 10 deny any
+</pre>
+
+<h3>Extended ACLs</h3>
+<p>Extended ACLs are more precise. They can match source and destination addresses, IP protocol (such as TCP, UDP, or ICMP), and TCP/UDP port numbers. They are used when a policy needs to permit or deny specific services—for example, allowing DNS but blocking web traffic. They are normally placed close to the source to stop unwanted traffic early.</p>
+<pre>
+access-list 100 deny tcp 10.2.2.0 0.0.0.255 10.1.1.0 0.0.0.255 eq 80
+access-list 100 permit ip any any
+</pre>
+
+<h3>Named ACLs</h3>
+<p>A named ACL uses a descriptive name instead of a number. It can be standard or extended. Named ACLs are easier to read and maintain, especially in larger configurations, and let you add or remove individual entries by sequence number.</p>
+<pre>
+ip access-list extended HR_TO_IT_POLICY
+ deny ip 10.2.2.0 0.0.0.255 10.1.1.0 0.0.0.255
+ permit ip any any
+</pre>
+
+<h3>Numbered ACLs</h3>
+<p>A numbered ACL is identified by an ACL number. On current Cisco IOS, both numbered and named ACLs can be edited using ACL configuration mode. Named ACLs are usually clearer because the policy purpose is visible in the configuration.</p>
+
+<h2>Difference between ACL types</h2>
+<table>
+    <thead><tr><th>Feature</th><th>Standard ACL</th><th>Extended ACL</th><th>Named ACL</th></tr></thead>
+    <tbody>
+        <tr><td>Matches source address</td><td>Yes</td><td>Yes</td><td>Depends on whether it is standard or extended</td></tr>
+        <tr><td>Matches destination address</td><td>No</td><td>Yes</td><td>Extended named ACL only</td></tr>
+        <tr><td>Matches protocol / port</td><td>No</td><td>Yes</td><td>Extended named ACL only</td></tr>
+        <tr><td>Identifier</td><td>Number</td><td>Number</td><td>Descriptive name</td></tr>
+        <tr><td>Typical placement</td><td>Near the destination</td><td>Near the source</td><td>Depends on its standard or extended behavior</td></tr>
+        <tr><td>Best use</td><td>Simple source-network policy</td><td>Detailed inter-VLAN or service policy</td><td>Readable, maintainable policy configuration</td></tr>
+    </tbody>
+</table>
+
+<h2>ACL design rules</h2>
+<ul>
+    <li>Write the most specific entries first; the first match wins.</li>
+    <li>Include explicit permit rules for traffic that must continue, especially before the implicit deny.</li>
+    <li>Use a named extended ACL for the upcoming inter-VLAN policy, because it clearly expresses the permitted and denied traffic.</li>
+    <li>Verify the ACL and its interface direction before testing: <code>show access-lists</code> and <code>show ip interface</code>.</li>
+</ul>
+
+<h2>Practical section</h2>
+<div class="notice"><b>Coming next:</b> this page will be extended with an inter-VLAN ACL practical. It will use the existing VLAN topology to allow required traffic while restricting selected VLAN-to-VLAN communication.</div>
+
+<a class="back" href="index.html">← All labs</a>
+</article></main>
+<footer>Basic Networking Labs · CCNA practice from scratch</footer>
+</body>
+</html>

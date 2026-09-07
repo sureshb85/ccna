@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CCNA VLAN trunking and DTP lab with five switches and eight PCs.">
+    <title>Lab 03 - VLAN Trunking and DTP</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="nav"><a class="brand" href="../index.html">CCNA <b>LABS</b></a><div class="navlinks"><a href="index.html">All labs</a></div></nav>
+<main class="wrap"><a class="back" href="index.html">← All labs</a><article class="lesson">
+
+<h1>Lab 03 - VLAN Trunking and DTP</h1>
+
+<h2>Objective</h2>
+<p>Build the five-switch topology shown, place eight PCs in VLANs 10, 20, 30, and 40, then carry those VLANs between the access switches and SW5. Practice both manually configured trunks and Dynamic Trunking Protocol (DTP).</p>
+
+<h2>Topology and cabling</h2>
+<pre>
+ PC1 (VLAN 10) -- Gi0/2 SW1 Gi0/0 -- Gi0/3 SW5 Gi0/1 -- Gi0/0 SW2 Gi0/1 -- PC3 (VLAN 30)
+ PC2 (VLAN 20) -- Gi0/1 SW1                    SW5 Gi0/2 -- Gi0/0 SW4 Gi0/1 -- PC7 (VLAN 30)
+                                               SW5 Gi0/3 -- Gi0/0 SW3 Gi0/1 -- PC5 (VLAN 40)
+                                                                    SW3 Gi0/2 -- PC6 (VLAN 20)
+                                               SW2 Gi0/2 -- PC4 (VLAN 40)
+                                               SW4 Gi0/2 -- PC8 (VLAN 10)
+
+ Inter-switch links
+ SW1 Gi0/0 &lt;--&gt; SW5 Gi0/0 : static trunk
+ SW2 Gi0/0 &lt;--&gt; SW5 Gi0/1 : DTP (auto -- desirable)
+ SW3 Gi0/0 &lt;--&gt; SW5 Gi0/3 : DTP (desirable -- desirable)
+ SW4 Gi0/0 &lt;--&gt; SW5 Gi0/2 : static trunk
+</pre>
+<p><strong>Note:</strong> The interface positions in the first two lines are written in connection order. Follow the explicit inter-switch table when cabling trunks; it is the authoritative mapping from the diagram. No router is present, so this is a Layer 2-only lab: hosts in different VLANs must not communicate.</p>
+
+<h2>Addressing and VLAN plan</h2>
+<pre>
+Device  Interface  Address         VLAN
+PC1     eth0       10.1.1.1/24     10
+PC2     eth0       10.1.1.2/24     20
+PC3     eth0       10.1.1.3/24     30
+PC4     eth0       10.1.1.4/24     40
+PC5     eth0       10.1.1.5/24     40
+PC6     eth0       10.1.1.6/24     20
+PC7     eth0       10.1.1.7/24     30
+PC8     eth0       10.1.1.8/24     10
+</pre>
+<p>All PCs use the same /24 exactly as shown in the supplied topology. Do not configure a default gateway: there is no Layer 3 gateway in this lab.</p>
+
+<h2>Step 1 - Configure the PCs</h2>
+<p>For VPCS nodes, run the corresponding command at each PC prompt. The slash-length is the subnet mask; no gateway is supplied.</p>
+<pre>
+PC1&gt; ip 10.1.1.1/24
+PC2&gt; ip 10.1.1.2/24
+PC3&gt; ip 10.1.1.3/24
+PC4&gt; ip 10.1.1.4/24
+PC5&gt; ip 10.1.1.5/24
+PC6&gt; ip 10.1.1.6/24
+PC7&gt; ip 10.1.1.7/24
+PC8&gt; ip 10.1.1.8/24
+
+# Optional check on every VPCS node
+PC1&gt; show ip
+</pre>
+
+<h2>Step 2 - Create the VLANs on every switch</h2>
+<p>VLANs are local to a switch unless VTP is deliberately configured. Therefore, run this block on <strong>SW1, SW2, SW3, SW4, and SW5</strong>. The names are descriptive only; the VLAN IDs determine membership.</p>
+<pre>
+enable
+configure terminal
+vlan 10
+ name VLAN_10
+vlan 20
+ name VLAN_20
+vlan 30
+ name VLAN_30
+vlan 40
+ name VLAN_40
+end
+copy running-config startup-config
+</pre>
+
+<h2>Step 3 - Configure access ports</h2>
+<p>Use <code>switchport mode access</code> so an end-device port cannot negotiate a trunk. Configure the following on each access switch.</p>
+
+<h3>SW1 - PC1 and PC2</h3>
+<pre>
+enable
+configure terminal
+interface gi0/2
+ description PC1_VLAN10
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+interface gi0/1
+ description PC2_VLAN20
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+end
+</pre>
+
+<h3>SW2 - PC3 and PC4</h3>
+<pre>
+enable
+configure terminal
+interface gi0/1
+ description PC3_VLAN30
+ switchport mode access
+ switchport access vlan 30
+ spanning-tree portfast
+interface gi0/2
+ description PC4_VLAN40
+ switchport mode access
+ switchport access vlan 40
+ spanning-tree portfast
+end
+</pre>
+
+<h3>SW3 - PC5 and PC6</h3>
+<pre>
+enable
+configure terminal
+interface gi0/1
+ description PC5_VLAN40
+ switchport mode access
+ switchport access vlan 40
+ spanning-tree portfast
+interface gi0/2
+ description PC6_VLAN20
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+end
+</pre>
+
+<h3>SW4 - PC7 and PC8</h3>
+<pre>
+enable
+configure terminal
+interface gi0/1
+ description PC7_VLAN30
+ switchport mode access
+ switchport access vlan 30
+ spanning-tree portfast
+interface gi0/2
+ description PC8_VLAN10
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+end
+</pre>
+
+<h2>Step 4 - Configure the trunks</h2>
+<p>For a static trunk, both ends are explicitly set to trunk. For the DTP links, use the requested negotiation modes. DTP is Cisco-proprietary and must be supported by the switch image; do not add <code>switchport nonegotiate</code> to either dynamic link.</p>
+
+<h3>SW1 to SW5 - static trunk</h3>
+<pre>
+SW1# configure terminal
+SW1(config)# interface gi0/0
+SW1(config-if)# description STATIC_TRUNK_TO_SW5_Gi0/0
+SW1(config-if)# switchport mode trunk
+SW1(config-if)# switchport trunk allowed vlan 10,20,30,40
+SW1(config-if)# end
+
+SW5# configure terminal
+SW5(config)# interface gi0/0
+SW5(config-if)# description STATIC_TRUNK_TO_SW1_Gi0/0
+SW5(config-if)# switchport mode trunk
+SW5(config-if)# switchport trunk allowed vlan 10,20,30,40
+SW5(config-if)# end
+</pre>
+
+<h3>SW2 to SW5 - DTP dynamic auto to dynamic desirable</h3>
+<pre>
+SW2# configure terminal
+SW2(config)# interface gi0/0
+SW2(config-if)# description DTP_AUTO_TO_SW5_Gi0/1
+SW2(config-if)# switchport mode dynamic auto
+SW2(config-if)# switchport trunk allowed vlan 10,20,30,40
+SW2(config-if)# end
+
+SW5# configure terminal
+SW5(config)# interface gi0/1
+SW5(config-if)# description DTP_DESIRABLE_TO_SW2_Gi0/0
+SW5(config-if)# switchport mode dynamic desirable
+SW5(config-if)# switchport trunk allowed vlan 10,20,30,40
+SW5(config-if)# end
+</pre>
+<p><strong>Why it works:</strong> <code>dynamic auto</code> is passive, while <code>dynamic desirable</code> actively proposes trunking. Their combination negotiates a trunk. Auto-to-auto would not form a trunk.</p>
+
+<h3>SW3 to SW5 - DTP dynamic desirable to dynamic desirable</h3>
+<pre>
+SW3# configure terminal
+SW3(config)# interface gi0/0
+SW3(config-if)# description DTP_DESIRABLE_TO_SW5_Gi0/3
+SW3(config-if)# switchport mode dynamic desirable
+SW3(config-if)# switchport trunk allowed vlan 10,20,30,40
+SW3(config-if)# end
+
+SW5# configure terminal
+SW5(config)# interface gi0/3
+SW5(config-if)# description DTP_DESIRABLE_TO_SW3_Gi0/0
+SW5(config-if)# switchport mode dynamic desirable
+SW5(config-if)# switchport trunk allowed vlan 10,20,30,40
+SW5(config-if)# end
+</pre>
+
+<h3>SW4 to SW5 - static trunk</h3>
+<pre>
+SW4# configure terminal
+SW4(config)# interface gi0/0
+SW4(config-if)# description STATIC_TRUNK_TO_SW5_Gi0/2
+SW4(config-if)# switchport mode trunk
+SW4(config-if)# switchport trunk allowed vlan 10,20,30,40
+SW4(config-if)# end
+
+SW5# configure terminal
+SW5(config)# interface gi0/2
+SW5(config-if)# description STATIC_TRUNK_TO_SW4_Gi0/0
+SW5(config-if)# switchport mode trunk
+SW5(config-if)# switchport trunk allowed vlan 10,20,30,40
+SW5(config-if)# end
+</pre>
+
+<p>On older multilayer-switch images that offer more than one encapsulation, insert <code>switchport trunk encapsulation dot1q</code> before <code>switchport mode trunk</code> on the two static-trunk interfaces. Many modern IOSvL2/Catalyst images support only 802.1Q and do not accept that command.</p>
+
+<h2>Step 5 - Save and verify</h2>
+<pre>
+! Run on every switch
+copy running-config startup-config
+show vlan brief
+show interfaces trunk
+show interfaces switchport
+
+! DTP-focused checks: run on SW2, SW3, and SW5
+show dtp interface gi0/0
+show dtp interface gi0/1
+show dtp interface gi0/3
+
+! Confirm MAC addresses are learned in the expected VLAN
+show mac address-table dynamic
+show mac address-table vlan 10
+show mac address-table vlan 20
+show mac address-table vlan 30
+show mac address-table vlan 40
+</pre>
+<p><code>show interfaces trunk</code> should show Gi0/0 on SW1 and SW4, and Gi0/0, Gi0/1, Gi0/3 on SW5 as trunking. It should also show VLANs 10,20,30,40 allowed and active. <code>show vlan brief</code> lists access ports only, so it normally does not list trunk ports under a VLAN.</p>
+
+<h2>End-to-end tests</h2>
+<pre>
+! These pings must succeed (same VLAN across the trunks)
+PC1&gt; ping 10.1.1.8    # VLAN 10: PC1 to PC8
+PC2&gt; ping 10.1.1.6    # VLAN 20: PC2 to PC6
+PC3&gt; ping 10.1.1.7    # VLAN 30: PC3 to PC7
+PC4&gt; ping 10.1.1.5    # VLAN 40: PC4 to PC5
+
+! This must fail (different VLANs and no inter-VLAN router)
+PC1&gt; ping 10.1.1.2
+</pre>
+<p>The first ping can lose one packet while ARP and MAC-address learning occur. Repeat it before declaring a fault.</p>
+
+<h2>Troubleshooting and debugging</h2>
+<p>Start with the non-disruptive show commands. Use live DTP debugging only briefly in a quiet lab because it can generate many console messages.</p>
+<pre>
+! 1. Confirm physical status and VLAN assignment
+show interfaces status
+show vlan brief
+show interfaces gi0/0 switchport
+
+! 2. Confirm each inter-switch link is actually trunking
+show interfaces trunk
+show interfaces gi0/0 trunk
+
+! 3. Inspect the negotiated administrative and operational modes
+show interfaces gi0/0 switchport
+show dtp interface gi0/0
+
+! 4. Watch DTP negotiation briefly (SW2/SW3/SW5 only)
+terminal monitor
+debug dtp events
+debug dtp packets
+undebug all
+
+! 5. Trace forwarding and spanning-tree state for a VLAN
+show spanning-tree vlan 10
+show spanning-tree vlan 20
+show mac address-table dynamic
+
+! 6. Check for interface errors or an administratively shut port
+show interfaces gi0/0
+show running-config interface gi0/0
+</pre>
+
+<h2>Common faults and fixes</h2>
+<pre>
+Symptom: SW2--SW5 does not form a trunk
+Check:   show dtp interface gi0/0 (SW2) and gi0/1 (SW5)
+Fix:     SW2 must be dynamic auto and SW5 must be dynamic desirable.
+
+Symptom: a VLAN is absent from show interfaces trunk
+Check:   show interfaces trunk; show vlan id &lt;vlan-id&gt;
+Fix:     create the VLAN on both switches and allow it on the trunk.
+
+Symptom: same-VLAN PCs cannot ping
+Check:   access-port VLAN, trunk state, allowed VLAN list, and MAC table.
+Fix:     correct the access VLAN and confirm every path trunk carries that VLAN.
+
+Symptom: different-VLAN PCs can never ping
+Meaning: expected in this topology; a router or Layer 3 switch with SVIs is required
+         for inter-VLAN routing.
+</pre>
+
+<h2>Key takeaways</h2>
+<p>A VLAN is a separate Layer 2 broadcast domain. A trunk carries tagged traffic for multiple VLANs between switches. Static trunks are predictable and recommended for production uplinks; DTP is useful for learning but is usually disabled on production-facing ports. In this lab, VLAN membership—not the shared IP subnet—decides which PCs can exchange Layer 2 frames.</p>
+
+<a class="back" href="index.html">← All labs</a>
+</article></main>
+<footer>Basic Networking Labs · CCNA practice from scratch</footer>
+</body>
+</html>

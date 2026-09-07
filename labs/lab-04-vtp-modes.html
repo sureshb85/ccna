@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CCNA VTP server, client, and transparent mode lab.">
+    <title>Lab 04 - VTP Modes</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<nav class="nav"><a class="brand" href="../index.html">CCNA <b>LABS</b></a><div class="navlinks"><a href="index.html">All labs</a></div></nav>
+<main class="wrap"><a class="back" href="index.html">← All labs</a><article class="lesson">
+
+<h1>Lab 04 - VTP Server, Client, and Transparent Modes</h1>
+
+<h2>Objective</h2>
+<p>Configure VTP version 2 across a three-switch line. The server advertises VLANs 10 through 70 to the client; the transparent switch forwards those advertisements but keeps its own locally created VLANs 80 and 90 separate.</p>
+
+<h2>Topology</h2>
+<pre>
+SERVER Gi0/0  &lt;---- static 802.1Q trunk ----&gt;  Gi0/0 TRANSPARENT Gi0/1
+                                                        |
+                                         static 802.1Q trunk
+                                                        |
+                                                   Gi0/0 CLIENT
+
+VTP domain: accenture       VTP password: cisco       VTP version: 2
+
+SERVER:      VLANs 10, 20, 30, 40, 50, 60, 70
+TRANSPARENT: locally created VLANs 80, 90
+CLIENT:      receives VLANs 10, 20, 30, 40, 50, 60, 70 from SERVER
+</pre>
+<p>No PCs are required. This lab verifies VLAN-database propagation, not end-host connectivity.</p>
+
+<h2>Important VTP behavior</h2>
+<pre>
+Server       Can create, change, and delete VLANs; advertises its VLAN database.
+Client       Learns VLANs from a VTP server; cannot create or modify normal VLANs locally.
+Transparent  Does not synchronize its VLAN database with VTP, but forwards VTP
+             advertisements over trunks. VLANs created here remain local to this switch.
+</pre>
+<p>All VTP participants that exchange a database need the same domain, password, and compatible VTP version. The inter-switch links must be operational trunks.</p>
+
+<h2>Step 1 - Build the trunks</h2>
+<p>Configure both links as static trunks first. This avoids relying on DTP and lets VTP advertisements traverse the topology predictably.</p>
+<pre>
+! SERVER
+enable
+configure terminal
+interface gi0/0
+ description TRUNK_TO_TRANSPARENT_Gi0/0
+ switchport mode trunk
+ switchport trunk allowed vlan 1,10-90
+ no shutdown
+end
+
+! TRANSPARENT
+enable
+configure terminal
+interface gi0/0
+ description TRUNK_TO_SERVER_Gi0/0
+ switchport mode trunk
+ switchport trunk allowed vlan 1,10-90
+ no shutdown
+interface gi0/1
+ description TRUNK_TO_CLIENT_Gi0/0
+ switchport mode trunk
+ switchport trunk allowed vlan 1,10-90
+ no shutdown
+end
+
+! CLIENT
+enable
+configure terminal
+interface gi0/0
+ description TRUNK_TO_TRANSPARENT_Gi0/1
+ switchport mode trunk
+ switchport trunk allowed vlan 1,10-90
+ no shutdown
+end
+</pre>
+<p>If the switch image has a selectable trunk encapsulation, add <code>switchport trunk encapsulation dot1q</code> immediately before <code>switchport mode trunk</code>. Modern IOSvL2 images normally support only 802.1Q and omit that command.</p>
+
+<h2>Step 2 - Configure VTP identity and mode</h2>
+<p>Configure the VTP version, domain, and password before adding server VLANs. The client configuration is done before the server creates VLANs so it can receive the advertisements.</p>
+
+<h3>SERVER</h3>
+<pre>
+enable
+configure terminal
+vtp version 2
+vtp domain accenture
+vtp password cisco
+vtp mode server
+end
+show vtp status
+</pre>
+
+<h3>TRANSPARENT</h3>
+<pre>
+enable
+configure terminal
+vtp version 2
+vtp domain accenture
+vtp password cisco
+vtp mode transparent
+end
+show vtp status
+</pre>
+
+<h3>CLIENT</h3>
+<pre>
+enable
+configure terminal
+vtp version 2
+vtp domain accenture
+vtp password cisco
+vtp mode client
+end
+show vtp status
+</pre>
+
+<h2>Step 3 - Create VLANs on SERVER</h2>
+<p>Only the server creates the shared VLANs. Each addition changes the VTP configuration revision and is advertised through the transparent switch to the client.</p>
+<pre>
+SERVER# configure terminal
+SERVER(config)# vlan 10
+SERVER(config-vlan)# name VLAN_10
+SERVER(config-vlan)# vlan 20
+SERVER(config-vlan)# name VLAN_20
+SERVER(config-vlan)# vlan 30
+SERVER(config-vlan)# name VLAN_30
+SERVER(config-vlan)# vlan 40
+SERVER(config-vlan)# name VLAN_40
+SERVER(config-vlan)# vlan 50
+SERVER(config-vlan)# name VLAN_50
+SERVER(config-vlan)# vlan 60
+SERVER(config-vlan)# name VLAN_60
+SERVER(config-vlan)# vlan 70
+SERVER(config-vlan)# name VLAN_70
+SERVER(config-vlan)# end
+SERVER# copy running-config startup-config
+</pre>
+
+<h2>Step 4 - Create local VLANs on TRANSPARENT</h2>
+<p>Transparent mode lets this switch maintain a separate local VLAN database. VLANs 80 and 90 are not learned by the client through VTP; they must be manually created there if they are ever needed on that switch.</p>
+<pre>
+TRANSPARENT# configure terminal
+TRANSPARENT(config)# vlan 80
+TRANSPARENT(config-vlan)# name LOCAL_VLAN_80
+TRANSPARENT(config-vlan)# vlan 90
+TRANSPARENT(config-vlan)# name LOCAL_VLAN_90
+TRANSPARENT(config-vlan)# end
+TRANSPARENT# copy running-config startup-config
+</pre>
+
+<h2>Verification</h2>
+<pre>
+! On all three switches: confirm trunk state
+show interfaces trunk
+
+! On all three switches: confirm domain, version, mode, and revision
+show vtp status
+
+! SERVER: VLANs 10 through 70 must appear
+show vlan brief
+
+! CLIENT: VLANs 10 through 70 must appear after advertisements arrive
+show vlan brief
+
+! TRANSPARENT: its local VLANs 80 and 90 must appear
+show vlan brief
+
+! Useful focused checks
+show vlan id 10
+show vlan id 80
+show interfaces gi0/0 switchport
+</pre>
+<p>Expected result: the server and client list VLANs 10, 20, 30, 40, 50, 60, and 70. The transparent switch lists its own VLANs 80 and 90. It continues forwarding the server’s VTP advertisements even though it does not synchronize its own database with them.</p>
+
+<h2>Debugging and troubleshooting</h2>
+<pre>
+! Confirm each physical link and trunk is up
+show interfaces status
+show interfaces trunk
+show interfaces gi0/0 switchport
+
+! Confirm VTP operating details, especially domain and revision
+show vtp status
+
+! Briefly view received and sent VTP advertisements in a quiet lab
+terminal monitor
+debug sw-vlan vtp events
+debug sw-vlan vtp packets
+undebug all
+
+! Check the configuration actually applied
+show running-config | include ^vtp
+show running-config interface gi0/0
+</pre>
+<pre>
+Problem: CLIENT does not learn VLANs 10-70
+Check:   Both trunks must be in the trunking state. Compare VTP domain, password,
+         and version with show vtp status.
+Fix:     Correct the mismatch, then wait briefly for an advertisement or recreate
+         one server VLAN name to generate a new revision.
+
+Problem: VLAN 80 or 90 is absent from CLIENT
+Meaning: expected. Transparent-switch VLANs are local and are not distributed by VTP.
+
+Problem: SERVER revision is unexpectedly high after connecting another switch
+Action:  Stop and investigate before configuring VLANs. A switch with a higher VTP
+         revision can overwrite a VTP domain's VLAN database. In production, use
+         transparent mode or reset/validate a new switch's VTP state before joining it.
+</pre>
+
+<h2>Key takeaways</h2>
+<p>VTP reduces repeated VLAN creation but adds operational risk because VLAN database changes can propagate. Transparent mode is often preferred in modern networks: it forwards VTP advertisements without accepting shared VLAN-database changes. Always verify trunks, domain, version, password, operating mode, and configuration revision before trusting VTP synchronization.</p>
+
+<a class="back" href="index.html">← All labs</a>
+</article></main>
+<footer>Basic Networking Labs · CCNA practice from scratch</footer>
+</body>
+</html>
